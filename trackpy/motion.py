@@ -102,6 +102,8 @@ def _fp_stderr_catch_errors(x):
     return stderr
 
 def _sum_columns_in_quadrature(results, err_columns):
+    """Summing in quadrature is an appropriate way to
+    propagate errors that are uncorrelated."""
     # initialize
     err = np.zeros_like(results[err_columns[0]])
 
