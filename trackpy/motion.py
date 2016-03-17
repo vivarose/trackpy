@@ -36,7 +36,8 @@ def msd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     --------
     imsd() and emsd()
     """
-    if traj['frame'].max() - traj['frame'].min() + 1 == len(traj):
+    if (traj['frame'].max() - traj['frame'].min() + 1 == len(traj) 
+            and not detail):
         # no gaps: use fourier-transform algorithm
         return _msd_fft(traj, mpp, fps, max_lagtime, detail, pos_columns)
     else:
@@ -74,14 +75,61 @@ def _msd_iter(pos, lagtimes):
         yield np.concatenate((np.nanmean(diff, axis=0),
                               np.nanmean(diff**2, axis=0)))
 
+def _msd_iter_detail(pos, lagtimes):
+    for lt in lagtimes:
+        diff = pos[lt:] - pos[:-lt]
+
+        stderr = []
+        for this_diff in diff.T:
+            this_diff = this_diff[np.isfinite(this_diff)]
+        
+            stderr.append(_fp_stderr_catch_errors(this_diff))
+            stderr.append(_fp_stderr_catch_errors(this_diff**2))
+
+        yield np.concatenate((np.concatenate((np.nanmean(diff, axis=0),
+                                              np.nanmean(diff**2, axis=0))),
+                              (stderr)))
+
+def _fp_stderr_catch_errors(x):
+    # available: https://github.com/manoharan-lab/flyvbjerg-std-err
+    from flyvbjerg_petersen_std_err import fp_stderr
+    
+    try:
+        stderr = fp_stderr(x)
+    except (IndexError,ZeroDivisionError):
+        stderr = np.Inf
+    
+    return stderr
+
+def _sum_columns_in_quadrature(results, err_columns):
+    # initialize
+    err = np.zeros_like(results[err_columns[0]])
+
+    # add the square of the error
+    for err_column in err_columns:
+        err += results[err_column]**2
+
+    # take the square root to sum in quadrature
+    err = np.sqrt(err)
+    
+    return err 
 
 def _msd_gaps(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     """Compute the mean displacement and mean squared displacement of one
     trajectory over a range of time intervals."""
     if pos_columns is None:
         pos_columns = ['x', 'y']
-    result_columns = ['<{}>'.format(p) for p in pos_columns] + \
-                     ['<{}^2>'.format(p) for p in pos_columns]
+
+    if detail:
+        result_columns = ['<{}>'.format(p) for p in pos_columns] + \
+                         ['<{}^2>'.format(p) for p in pos_columns] 
+        for p in pos_columns:
+            result_columns.append('<{}>_stderr'.format(p))
+            result_columns.append('<{}^2>_stderr'.format(p))
+        MSD_err_columns = ['<{}^2>_stderr'.format(p) for p in pos_columns]
+    else:
+        result_columns = ['<{}>'.format(p) for p in pos_columns] + \
+                         ['<{}^2>'.format(p) for p in pos_columns]
 
     # Reindex with consecutive frames, placing NaNs in the gaps.
     pos = traj.set_index('frame')[pos_columns] * mpp
@@ -91,14 +139,24 @@ def _msd_gaps(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
 
     lagtimes = np.arange(1, max_lagtime + 1)
 
-    result = pd.DataFrame(_msd_iter(pos.values, lagtimes),
-                          columns=result_columns, index=lagtimes)
+    if detail: # calculate stderr
+        result = pd.DataFrame(_msd_iter_detail(pos.values, lagtimes),
+                              columns=result_columns, index=lagtimes)
+    else:
+        result = pd.DataFrame(_msd_iter(pos.values, lagtimes),
+                              columns=result_columns, index=lagtimes)
     result['msd'] = result[result_columns[len(pos_columns):
                                           2*len(pos_columns)]].sum(1)
     if detail:
         # effective number of measurements
         # approximately corrected with number of gaps
         result['N'] = _msd_N(len(pos), lagtimes) * len(traj) / len(pos)
+
+        # Propagate the error by calculating the sum in quadrature 
+        # of the <pos^2>_stderr columns.
+        # This assumes that the <pos^2> are not correlated with each other.
+        result['msd_stderr'] = _sum_columns_in_quadrature(result, MSD_err_columns)
+
     result['lagt'] = result.index.values/float(fps)
     result.index.name = 'lagt'
     return result
@@ -148,7 +206,6 @@ def _msd_fft(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     results.index.name = 'lagt'
 
     return results
-
 
 def imsd(traj, mpp, fps, max_lagtime=100, statistic='msd', pos_columns=None):
     """Compute the mean squared displacement of each particle.
