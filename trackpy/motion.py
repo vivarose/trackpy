@@ -300,7 +300,7 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
         on the other hand, is calculated with weights based
         on the frequency.) Returns only <r^2> by default. If
         pandas is out-of-date, the std columns may not be
-        calculated. 
+        calculated.
     pos_columns : The names of the pos_columns in traj. If
         None, pos_columns will be set to ['x','y'].
 
@@ -371,7 +371,12 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
         # This error may arise if pandas is out of date:
         #     Pandas 0.13.1 throws a TypeError.
         #     Pandas 0.14.1 does not.
-        return results.set_index('lagt')
+
+        results_columns = mean_displacement_columns
+        results_columns.append('N')
+        results_columns.append('lagt') 
+
+        return results[results_columns].set_index('lagt')
 
 def compute_drift(traj, smoothing=0, pos_columns=None):
     """Return the ensemble drift, x(t).
