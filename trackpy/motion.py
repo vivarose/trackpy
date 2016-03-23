@@ -329,13 +329,29 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     if not detail:
         return results.set_index('lagt')['msd']
 
+    mean_displacement_columns = ['<{}>'.format(p) for p in pos_columns] + \
+                                ['<{}^2>'.format(p) for p in pos_columns] + \
+                                ['msd']
     try:
-        # Calculation of biased weighted standard deviation
-        numerator = ((msds.subtract(results))**2).mul(msds['N'], axis=0).sum(level=1)
-        denominator = msds['N'].sum(level=1)
-        denominator -= 1    # Bessel's correction
+        # Calculate standard deviation using reliability
+        # weights based on stderr.
+
+        # initialize dataframes
+        numerator = results.loc[:,mean_displacement_columns] * 0
+        denominator = numerator.copy()
+
+        # calculate numerator and denominator
+        for column_name in mean_displacement_columns:
+            stderr_column = column_name + '_stderr'
+            weight = 1/((msds[stderr_column])**2)
+
+            numerator[column_name] = (((msds[column_name] - results[column_name])**2) * weight).sum(level=1)
+
+            V1 = weight.sum(level=1)
+            V2 = (weight**2).sum(level=1)
+            denominator[column_name] = V1-V2/V1  # for unbiased variance using reliability weights
+
         variance = numerator.div(denominator, axis=0)
-        variance = variance.loc[:,:'msd']
         std = np.sqrt(variance)
         std.columns = std.columns + '_std'
     
@@ -346,7 +362,6 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
         #     Pandas 0.13.1 throws a TypeError.
         #     Pandas 0.14.1 does not.
         return results.set_index('lagt')
-
 
 def compute_drift(traj, smoothing=0, pos_columns=None):
     """Return the ensemble drift, x(t).
