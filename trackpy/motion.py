@@ -97,6 +97,10 @@ def _fp_stderr_catch_errors(data):
     Determine the standard error of the data,
     using the Flyvbjerg-Petersen approach
     because the datapoints are likely to be correlated with each other.
+
+    Parameters: data
+    A series of datapoints that may be correlated with each
+    other.
     
     Returns: (stderr,std_err_err)
     where stderr is the estimate of the standard error of the data
