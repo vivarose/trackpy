@@ -82,24 +82,52 @@ def _msd_iter_detail(pos, lagtimes):
         stderr = []
         for this_diff in diff.T:
             this_diff = this_diff[np.isfinite(this_diff)]
-        
-            stderr.append(_fp_stderr_catch_errors(this_diff))
-            stderr.append(_fp_stderr_catch_errors(this_diff**2))
+
+	    this_diff_stderr,err_err1 = _fp_stderr_catch_errors(this_diff)
+	    this_diff2_stderr,err_err2 = _fp_stderr_catch_errors(this_diff**2)
+            stderr.append(this_diff_stderr)
+            stderr.append(this_diff2_stderr)
 
         yield np.concatenate((np.concatenate((np.nanmean(diff, axis=0),
                                               np.nanmean(diff**2, axis=0))),
                               (stderr)))
 
-def _fp_stderr_catch_errors(x):
-    # available: https://github.com/manoharan-lab/flyvbjerg-std-err
-    from flyvbjerg_petersen_std_err import fp_stderr
+def _fp_stderr_catch_errors(data):
+    '''
+    Determine the standard error of the data,
+    using the Flyvbjerg-Petersen approach
+    because the datapoints are likely to be correlated with each other.
     
+    Returns: (stderr,std_err_err)
+    where stderr is the estimate of the standard error of the data
+    and std_err_err is the error on that estimate.
+    '''
     try:
-        stderr = fp_stderr(x)
-    except (IndexError,ZeroDivisionError):
-        stderr = np.Inf
-    
-    return stderr
+        import pyblock
+        reblock_data = pyblock.blocking.reblock(data)
+        opt = pyblock.blocking.find_optimal_block(len(rand_data),reblock_data)
+        return (float(reblock_data[opt[0]].std_err),
+                float(reblock_data[opt[0]].std_err_err))
+    except:
+        # pyblock cannot find an optimum blocking for the std_err.
+        try:
+            # Available: https://github.com/manoharan-lab/flyvbjerg-std-err
+            from flyvbjerg_petersen_std_err import fp_stderr
+            stderr = fp_stderr(data)
+            return (stderr, np.nan)
+        except:
+            try:
+                # Return the maximum error obtained by pyblock
+                reblock_data_list = np.ones((len(reblock_data)))
+                for j in range(len(reblock_data)):
+                    reblock_data_list[j]= reblock_data[j].std_err
+                stderr = reblock_data_list.max()
+                return (stderr, np.nan)
+            except:
+                # Nothing works.
+                # Might be only 1 or 0 datapoints
+                # Might be import errors if neither package is available.
+                return (np.inf, np.nan)
 
 def _sum_columns_in_quadrature(results, err_columns):
     """Summing in quadrature is an appropriate way to
