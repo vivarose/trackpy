@@ -99,8 +99,9 @@ def _fp_stderr_catch_errors(data):
     because the datapoints are likely to be correlated with each other.
 
     Parameters: data
-    A series of datapoints that may be correlated with each
-    other.
+    A numpy.ndarray containing numpy.float64 values, which
+    are series of datapoints that may be correlated with
+    each other.
     
     Returns: (stderr,std_err_err)
     where stderr is the estimate of the standard error of the data
