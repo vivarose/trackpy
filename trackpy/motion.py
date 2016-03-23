@@ -293,11 +293,14 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     max_lagtime : intervals of frames out to which MSD is computed
         Default: 100
     detail : Set to True to include <x>, <y>, <x^2>, <y^2>,
-        N, and their biased weighted standard deviations in
-        the mean, <x>_std, <y>_std, <x^2>_std, <y^2>_std,
-        and msd_std.  Returns only <r^2> by default. If
+        N, and their standard deviations, <x>_std, <y>_std,
+        <x^2>_std, <y^2>_std, and msd_std. The standard
+        deviations are calculated with weights based on the
+        stderr of the individual particles msds. (The msd,
+        on the other hand, is calculated with weights based
+        on the frequency.) Returns only <r^2> by default. If
         pandas is out-of-date, the std columns may not be
-        calculated.
+        calculated. 
     pos_columns : The names of the pos_columns in traj. If
         None, pos_columns will be set to ['x','y'].
 
