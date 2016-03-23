@@ -332,6 +332,7 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     mean_displacement_columns = ['<{}>'.format(p) for p in pos_columns] + \
                                 ['<{}^2>'.format(p) for p in pos_columns] + \
                                 ['msd']
+
     try:
         # Calculate standard deviation using reliability
         # weights based on stderr.
@@ -351,11 +352,17 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
             V2 = (weight**2).sum(level=1)
             denominator[column_name] = V1-V2/V1  # for unbiased variance using reliability weights
 
+        # calculate variance and standard deviation
         variance = numerator.div(denominator, axis=0)
         std = np.sqrt(variance)
         std.columns = std.columns + '_std'
+
+        # Choose appropriate results columns
+        results_columns = mean_displacement_columns
+        results_columns.append('N')
+        results_columns.append('lagt') 
     
-        return results.join(std).set_index('lagt')
+        return results[results_columns].join(std).set_index('lagt')
 
     except TypeError:
         # This error may arise if pandas is out of date:
