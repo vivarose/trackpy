@@ -109,7 +109,7 @@ def _fp_stderr_catch_errors(data):
     try:
         import pyblock
         reblock_data = pyblock.blocking.reblock(data)
-        opt = pyblock.blocking.find_optimal_block(len(rand_data),reblock_data)
+        opt = pyblock.blocking.find_optimal_block(len(data),reblock_data)
         return (float(reblock_data[opt[0]].std_err),
                 float(reblock_data[opt[0]].std_err_err))
     except:
