@@ -313,6 +313,9 @@ def emsd(traj, mpp, fps, max_lagtime=100, detail=False, pos_columns=None):
     -----
     Input units are pixels and frames. Output units are microns and seconds.
     """
+    if pos_columns == None:
+        pos_columns = ['x','y']
+
     ids = []
     msds = []
     for pid, ptraj in traj.reset_index(drop=True).groupby('particle'):
